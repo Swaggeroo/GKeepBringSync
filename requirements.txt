@@ -1,0 +1,2 @@
+python-bring-api~=2.0.0
+gkeepapi~=0.15.1
