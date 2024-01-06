@@ -10,7 +10,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-
+  REPRO_NAME: gkeepbringsync
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
@@ -55,6 +55,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ env.IMAGE_NAME }}
+            swaggeroo/${{ env.REPRO_NAME }}
           tags: |
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
             type=ref,event=branch
