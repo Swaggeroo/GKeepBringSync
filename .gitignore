@@ -2,6 +2,8 @@
 .idea
 *.iml
 /node_modules/
+/src/list.txt
+/src/token.txt
 
 ### JetBrains template
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
