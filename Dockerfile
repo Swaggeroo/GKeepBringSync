@@ -5,7 +5,7 @@ LABEL authors="Swaggeroo"
 COPY src/app.py .
 COPY requirements.txt .
 
-RUN pip install -r requirements.txt
+RUN pip install python-bring-api gkeepapi gpsoauth==1.0.2 urllib3==1.25.1 schedule
 
 # start app
 CMD [ "python", "./app.py" ]

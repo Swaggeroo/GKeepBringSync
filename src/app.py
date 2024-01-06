@@ -14,15 +14,6 @@ SYNC_MODE = int(os.environ.get('SYNC_MODE', "0"))  # 0 = bidirectional, 1 = brin
 TIMEOUT = int(os.environ.get('TIMEOUT', "60"))  # in minutes
 # BRING_LIST_NAME
 
-# if one is none quit
-if (GOOGLE_EMAIL is None
-        or GOOGLE_PASSWORD is None
-        or BRING_EMAIL is None
-        or BRING_PASSWORD is None
-        or KEEP_LIST_ID is None):
-    print("Please set all environment variables (see Repo)")
-    exit(1)
-
 gkeepapi.node.DEBUG = True
 keep = gkeepapi.Keep()
 bring = Bring(BRING_EMAIL, BRING_PASSWORD)
