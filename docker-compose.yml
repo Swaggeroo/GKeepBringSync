@@ -5,7 +5,7 @@ services:
     image: ghcr.io/swaggeroo/gkeepbringsync
     restart: unless-stopped
     volumes:
-      - ./data/:/usr/src/app/data/ # google auth token inside keep it secret this can access your google account
+      - ./data:/usr/src/app/data # google auth token inside keep it secret this can access your google account
     environment:
       # Google
       - GOOGLE_EMAIL=<your email>
