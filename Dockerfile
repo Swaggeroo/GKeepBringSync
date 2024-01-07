@@ -1,4 +1,4 @@
-FROM python:3.10-alpine
+FROM python:3.10
 LABEL authors="Swaggeroo"
 
 WORKDIR /usr/src/app
