@@ -1,0 +1,20 @@
+version: "3"
+
+services:
+  internet-monitor:
+    image: ghcr.io/swaggeroo/gkeepbringsync
+    restart: unless-stopped
+    environment:
+      # Google
+      - GOOGLE_EMAIL=<your email>
+      - GOOGLE_PASSWORD=<your password>
+      - KEEP_LIST_ID=<your list id>
+
+      # Bring
+      - BRING_EMAIL=<your email>
+      - BRING_PASSWORD=<your password>
+
+
+      # OPTIONAL
+      #- SYNC_MODE=0 # 0 = bidirectional, 1 = bring master, 2 = google master
+      #- TIMEOUT=60 # minutes
