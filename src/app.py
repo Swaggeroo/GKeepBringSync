@@ -151,12 +151,16 @@ def sync(keep_list, bring_list):
                 cached_list.append(item)
             elif item not in bring_items:
                 cached_list.remove(item)
+            elif item in bring_items and item not in cached_list:
+                cached_list.append(item)
         for item in bring_items:
             if item not in keep_items and item not in cached_list:
                 keep_items.append(item)
                 cached_list.append(item)
             elif item not in keep_items:
                 cached_list.remove(item)
+            elif item in keep_items and item not in cached_list:
+                cached_list.append(item)
         save_list(cached_list)
         apply_list(cached_list, bring_list, keep_list)
     elif SYNC_MODE == 1:
@@ -197,18 +201,6 @@ def apply_list(new_list, bring_list, keep_list):
     :param new_list: The list to apply.
     :param bring_list: The Bring list to apply the new list to.
     :param keep_list: The Google Keep list to apply the new list to.
-    """
-    """
-    bring_items = getAllItemsBring(bring_list)
-    keep_items = getAllItemsKeep(keep_list)
-    for item in set(bring_items) - set(new_list):
-        bring.removeItem(bring_list['listUuid'], item.encode('utf-8').decode('ISO-8859-9'))
-    for item in set(new_list) - set(bring_items):
-        bring.saveItem(bring_list['listUuid'], item.encode('utf-8').decode('ISO-8859-9'))
-    for item in set(keep_items) - set(new_list):
-        [i for i in keep_list.unchecked if i.text == item][0].delete()
-    for item in set(new_list) - set(keep_items):
-        keep_list.add(item.encode('utf-8').decode('ISO-8859-9'), False, gkeepapi.node.NewListItemPlacementValue.Bottom)
     """
 
     # bring
