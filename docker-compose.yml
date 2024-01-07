@@ -1,7 +1,7 @@
 version: "3"
 
 services:
-  internet-monitor:
+  gkeepbringsync:
     image: ghcr.io/swaggeroo/gkeepbringsync
     restart: unless-stopped
     volumes:
