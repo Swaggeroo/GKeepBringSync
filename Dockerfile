@@ -6,9 +6,11 @@ WORKDIR /usr/src/app
 # install dependencies from requirements.txt
 COPY src/app.py .
 
+ENV PYTHONUNBUFFERED=1
+
 RUN mkdir ./data
 
 RUN pip install python-bring-api gkeepapi schedule gpsoauth==1.0.2 urllib3==1.25.1
 
 # start app
-CMD [ "python", "./app.py" ]
+CMD [ "python", "-u", "./app.py" ]
