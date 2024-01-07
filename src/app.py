@@ -36,6 +36,12 @@ def login():
             token = keep.getMasterToken()
             with open('./data/token.txt', 'w') as fnew:
                 fnew.write(str(token))
+    elif os.environ.get('GOOGLE_TOKEN') is not None:
+        print("Using provided google token")
+        keep.resume(GOOGLE_EMAIL, os.environ.get('GOOGLE_TOKEN'))
+        token = keep.getMasterToken()
+        with open('./data/token.txt', 'w') as f:
+            f.write(str(token))
     else:
         print("Getting new google token")
         keep.login(GOOGLE_EMAIL, GOOGLE_PASSWORD)

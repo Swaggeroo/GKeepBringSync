@@ -21,3 +21,4 @@ services:
       #- SYNC_MODE=0 # 0 = bidirectional, 1 = bring master, 2 = google master
       #- TIMEOUT=60 # minutes
       #- BRING_LIST_NAME=Groceries
+      #- GOOGLE_TOKEN=<your token>
