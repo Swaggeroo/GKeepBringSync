@@ -32,4 +32,4 @@ You need to provide the following environment variables:
 ### Please note
 - The token.txt file is used to store the Google Auth token. It is created automatically. You can delete it at any time to force a new login. Keep it safe as it can be used to access your Google account.
 - I didn't tested expiration of the token yet. If it expires, the script will probably crash. At the next run it should delete the token.txt and crash again. After that it should work again. With docker this should be no problem as the container will be restarted automatically.
-- At first run the script will take the keep and bring lists and merge them. After that it will only sync changes.
+- At first run the script will take the keep and bring lists and merge them (Only with SYNC_MODE 0). After that it will only sync changes.
