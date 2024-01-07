@@ -8,8 +8,7 @@ COPY src/app.py .
 
 RUN mkdir ./data
 
-RUN pip install python-bring-api gkeepapi schedule
-RUN pip install gpsoauth==1.0.2 urllib3==1.25.1
+RUN pip install python-bring-api gkeepapi schedule gpsoauth==1.0.2 urllib3==1.25.1
 
 # start app
 CMD [ "python", "./app.py" ]
