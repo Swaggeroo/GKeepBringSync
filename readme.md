@@ -33,5 +33,6 @@ You need to provide the following environment variables:
 ### Please note
 - **!!Important!!** I couldn't get the Google Auth work in the container. Therefore I first ran the script locally and copied the token.txt file to the container or used the GOOGLE_TOKEN env var. YES you need not matching dependencies (At least I needed). You probably need to install them manually. If you know how to fix this, please let me know.
 - The token.txt file is used to store the Google Auth token. It is created automatically. You can delete it at any time to force a new login. Keep it safe as it can be used to access your Google account.
-- I didn't tested expiration of the token yet. If it expires, the script will probably crash. At the next run it should delete the token.txt and crash again. After that it should work again. With docker this should be no problem as the container will be restarted automatically.
-- At first run the script will take the keep and bring lists and merge them (Only with SYNC_MODE 0). After that it will only sync changes.
+- I didn't test the expiration of the token yet. If it expires, the script will probably crash. At the next run it should delete the token.txt and crash again. After that it should work again. With docker this should be no problem as the container will be restarted automatically.
+- At the first run the script will take the keep and bring lists and merge them (Only with SYNC_MODE 0). After that it will only sync changes.
+- On my server it must run in host network mode.
