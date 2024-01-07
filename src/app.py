@@ -26,21 +26,21 @@ def login():
     """
     bring.login()
 
-    if os.path.exists('token.txt'):
+    if os.path.exists('./data/token.txt'):
         print("Using cached google token")
-        with open('token.txt', 'r') as f:
+        with open('./data/token.txt', 'r') as f:
             token = f.read()
             f.close()
-            os.remove('token.txt')
+            os.remove('./data/token.txt')
             keep.resume(GOOGLE_EMAIL, token)
             token = keep.getMasterToken()
-            with open('token.txt', 'w') as fnew:
+            with open('./data/token.txt', 'w') as fnew:
                 fnew.write(str(token))
     else:
         print("Getting new google token")
         keep.login(GOOGLE_EMAIL, GOOGLE_PASSWORD)
         token = keep.getMasterToken()
-        with open('token.txt', 'w') as f:
+        with open('./data/token.txt', 'w') as f:
             f.write(str(token))
     print("Logged in")
 
@@ -166,8 +166,8 @@ def load_cached_list():
     Loads the cached list from a file.
     Returns the list if it exists, otherwise returns None.
     """
-    if os.path.exists('list.txt'):
-        with open('list.txt', 'r', encoding="utf-8") as f:
+    if os.path.exists('./data/list.txt'):
+        with open('./data/list.txt', 'r', encoding="utf-8") as f:
             keep_list = f.read().split('\n')
             f.close()
             return keep_list
@@ -180,7 +180,7 @@ def save_list(new_list):
     Saves the provided list to a file.
     :param new_list: The list to save.
     """
-    with open('list.txt', 'w', encoding="utf-8") as f:
+    with open('./data/list.txt', 'w', encoding="utf-8") as f:
         f.write('\n'.join(new_list))
         f.close()
 
