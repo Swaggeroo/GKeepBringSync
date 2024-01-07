@@ -4,6 +4,9 @@ services:
   internet-monitor:
     image: ghcr.io/swaggeroo/gkeepbringsync
     restart: unless-stopped
+    volumes:
+      - ./token.txt:/opt/gkeepbringsync/token.txt # Google Auth token keep it safe it's like your password
+      - ./list.txt:/opt/gkeepbringsync/list.txt
     environment:
       # Google
       - GOOGLE_EMAIL=<your email>
@@ -18,3 +21,4 @@ services:
       # OPTIONAL
       #- SYNC_MODE=0 # 0 = bidirectional, 1 = bring master, 2 = google master
       #- TIMEOUT=60 # minutes
+      #- BRING_LIST_NAME=Groceries
