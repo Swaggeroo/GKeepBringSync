@@ -5,18 +5,17 @@ from datetime import datetime
 
 import gkeepapi
 import schedule
+from decouple import config
 from python_bring_api.bring import Bring
 
 # Constants
-GOOGLE_EMAIL = os.environ["GOOGLE_EMAIL"]
-GOOGLE_PASSWORD = os.environ["GOOGLE_PASSWORD"]
-BRING_EMAIL = os.environ["GOOGLE_EMAIL"]
-BRING_PASSWORD = os.environ["BRING_PASSWORD"]
-KEEP_LIST_ID = os.environ["KEEP_LIST_ID"]
-SYNC_MODE = int(
-    os.environ.get("SYNC_MODE", "0")
-)  # 0 = bidirectional, 1 = bring master, 2 = google master
-TIMEOUT = int(os.environ.get("TIMEOUT", "60"))  # in minutes
+GOOGLE_EMAIL = config("GOOGLE_EMAIL")
+GOOGLE_PASSWORD = config("GOOGLE_PASSWORD")
+BRING_EMAIL = config("GOOGLE_EMAIL")
+BRING_PASSWORD = config("BRING_PASSWORD")
+KEEP_LIST_ID = config("KEEP_LIST_ID")
+SYNC_MODE = int(config("SYNC_MODE", default="0"))
+TIMEOUT = int(config("TIMEOUT", default="60"))
 
 # Logging
 logging.basicConfig(
@@ -45,9 +44,9 @@ def login():
             token = keep.getMasterToken()
             with open("./data/token.txt", "w") as fnew:
                 fnew.write(str(token))
-    elif os.environ.get("GOOGLE_TOKEN") is not None:
+    elif config("GOOGLE_TOKEN") is not None:
         logging.info("Using provided google token")
-        keep.resume(GOOGLE_EMAIL, os.environ.get("GOOGLE_TOKEN"))
+        keep.resume(GOOGLE_EMAIL, config("GOOGLE_TOKEN"))
         token = keep.getMasterToken()
         with open("./data/token.txt", "w") as f:
             f.write(str(token))
@@ -104,9 +103,9 @@ def get_bring_list(lists):
     :param lists: The list of Bring lists.
     :return: The selected Bring list.
     """
-    if os.environ.get("BRING_LIST_NAME") is not None:
+    if config("BRING_LIST_NAME") is not None:
         for bring_list in lists:
-            if bring_list["name"] == os.environ.get("BRING_LIST_NAME"):
+            if bring_list["name"] == config("BRING_LIST_NAME"):
                 return bring_list
     return lists[0]
 
