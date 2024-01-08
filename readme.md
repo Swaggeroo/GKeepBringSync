@@ -1,5 +1,5 @@
 # Google Keep <-> Bring sync
-This is a simple script to sync your Google Keep notes with Bring shopping lists and vice versa. IMPORTANT: Read the whole readme, there are some special things to get it working.
+This is a simple script to sync your Google Keep notes with Bring shopping lists and vice versa. **IMPORTANT**: Read the whole readme, there are some special things to get it working.
 
 ## Disclaimer
 This script is not affiliated with Google or Bring. It is not guaranteed to work and may break at any time. Use at your own risk.
