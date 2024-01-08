@@ -1,18 +1,29 @@
-﻿import os
+﻿import logging
+import os
+import time
+from datetime import datetime
+from typing import List, Optional
+
 import gkeepapi
 import schedule
-import time
+from decouple import config
 from python_bring_api.bring import Bring
-from datetime import datetime
 
 # Constants
-GOOGLE_EMAIL = os.environ['GOOGLE_EMAIL']
-GOOGLE_PASSWORD = os.environ['GOOGLE_PASSWORD']
-BRING_EMAIL = os.environ['GOOGLE_EMAIL']
-BRING_PASSWORD = os.environ['BRING_PASSWORD']
-KEEP_LIST_ID = os.environ['KEEP_LIST_ID']
-SYNC_MODE = int(os.environ.get('SYNC_MODE', "0"))  # 0 = bidirectional, 1 = bring master, 2 = google master
-TIMEOUT = int(os.environ.get('TIMEOUT', "60"))  # in minutes
+GOOGLE_EMAIL: str = config("GOOGLE_EMAIL")
+GOOGLE_PASSWORD: str = config("GOOGLE_PASSWORD")
+BRING_EMAIL: str = config("GOOGLE_EMAIL")
+BRING_PASSWORD: str = config("BRING_PASSWORD")
+KEEP_LIST_ID: str = config("KEEP_LIST_ID")
+SYNC_MODE: int = config("SYNC_MODE", default="0", cast=int)
+TIMEOUT: int = config("TIMEOUT", default="60", cast=int)
+BRING_LIST_NAME: Optional[str] = config("BRING_LIST_NAME", default=None)
+GOOGLE_TOKEN: Optional[str] = config("GOOGLE_TOKEN", default=None)
+
+# Logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 # init services
 gkeepapi.node.DEBUG = True
@@ -20,48 +31,50 @@ keep = gkeepapi.Keep()
 bring = Bring(BRING_EMAIL, BRING_PASSWORD)
 
 
-def login():
+def login() -> None:
     """
     Logs into the Bring and Google Keep services.
     """
     bring.login()
 
-    if os.path.exists('./data/token.txt'):
-        print("Using cached google token")
-        with open('./data/token.txt', 'r') as f:
+    token_file_path = "./data/token.txt"
+
+    if os.path.exists(token_file_path):
+        logging.info("Using cached google token")
+        with open(token_file_path, "r") as f:
             token = f.read()
-            f.close()
-            os.remove('./data/token.txt')
-            keep.resume(GOOGLE_EMAIL, token)
-            token = keep.getMasterToken()
-            with open('./data/token.txt', 'w') as fnew:
-                fnew.write(str(token))
-    elif os.environ.get('GOOGLE_TOKEN') is not None:
-        print("Using provided google token")
-        keep.resume(GOOGLE_EMAIL, os.environ.get('GOOGLE_TOKEN'))
+        os.remove(token_file_path)
+        keep.resume(GOOGLE_EMAIL, token)
         token = keep.getMasterToken()
-        with open('./data/token.txt', 'w') as f:
-            f.write(str(token))
+    elif GOOGLE_TOKEN:
+        logging.info("Using provided google token")
+        keep.resume(GOOGLE_EMAIL, GOOGLE_TOKEN)
+        token = keep.getMasterToken()
     else:
-        print("Getting new google token")
+        logging.info("Getting new google token")
         keep.login(GOOGLE_EMAIL, GOOGLE_PASSWORD)
         token = keep.getMasterToken()
-        with open('./data/token.txt', 'w') as f:
-            f.write(str(token))
-    print("Logged in")
+
+    logging.info("Saving google token")
+    with open(token_file_path, "w") as f:
+        f.write(str(token))
+
+    logging.info("Logged in")
 
 
-def delete_old_items(note):
+def delete_old_items(note: gkeepapi.node.TopLevelNode) -> None:
     """
     Deletes all checked items from the provided Google Keep note.
     :param note: The Google Keep note to delete items from.
     """
     for item in note.checked:
-        print('Deleting item: ' + item.text)
+        logging.info(f"Deleting item: {item.text}")
         item.delete()
 
 
-def get_keep_list_item(name, keep_list):
+def get_keep_list_item(
+    name: str, keep_list: gkeepapi.node.List
+) -> Optional[gkeepapi.node.ListItem]:
     """
     Returns the unchecked item with the provided name from the Google Keep list.
     If no such item exists, it returns None.
@@ -75,7 +88,7 @@ def get_keep_list_item(name, keep_list):
     return None
 
 
-def delete_duplicates(keep_list):
+def delete_duplicates(keep_list: gkeepapi.node.List) -> None:
     """
     Deletes duplicate items from the provided Google Keep list.
     :param keep_list: The Google Keep list to delete duplicates from.
@@ -83,36 +96,36 @@ def delete_duplicates(keep_list):
     items = getAllItemsKeep(keep_list)
     for item in items:
         if items.count(item) > 1:
-            print('Deleting duplicate item: ' + item)
+            logging.info(f"Deleting duplicate item: {item}")
             get_keep_list_item(item, keep_list).delete()
             items.remove(item)
 
 
-def get_bring_list(lists):
+def get_bring_list(lists: List[dict]) -> dict:
     """
     Returns the Bring list that matches the name provided in the environment variable 'BRING_LIST_NAME'.
     If 'BRING_LIST_NAME' is not set, it returns the first list.
     :param lists: The list of Bring lists.
     :return: The selected Bring list.
     """
-    if os.environ.get('BRING_LIST_NAME') is not None:
+    if BRING_LIST_NAME:
         for bring_list in lists:
-            if bring_list['name'] == os.environ.get('BRING_LIST_NAME'):
+            if bring_list["name"] == BRING_LIST_NAME:
                 return bring_list
     return lists[0]
 
 
-def getAllItemsBring(bring_list):
+def getAllItemsBring(bring_list: dict) -> List[str]:
     """
     Returns all items in the provided Bring list.
     :param bring_list: The Bring list to get items from.
     :return: A list of all items in the Bring list.
     """
-    items = bring.getItems(bring_list['listUuid'])
-    return [item['name'] for item in items['purchase']]
+    items = bring.getItems(bring_list["listUuid"])
+    return [item["name"] for item in items["purchase"]]
 
 
-def getAllItemsKeep(keep_list):
+def getAllItemsKeep(keep_list: gkeepapi.node.List) -> List[str]:
     """
     Returns all unchecked items in the provided Google Keep note.
     :param keep_list: The Google Keep note to get items from.
@@ -121,14 +134,14 @@ def getAllItemsKeep(keep_list):
     return [item.text for item in keep_list.unchecked]
 
 
-def sync(keep_list, bring_list):
+def sync(keep_list: gkeepapi.node.List, bring_list: dict) -> None:
     """
     Synchronizes the provided Google Keep and Bring lists
     based on the sync mode set in the environment variable 'SYNC_MODE'.
     :param keep_list: The Google Keep list to synchronize.
     :param bring_list: The Bring list to synchronize.
     """
-    print('Syncing lists ' + str(datetime.now()))
+    logging.info("Syncing lists " + str(datetime.now()))
     keep.sync()
 
     delete_old_items(keep_list)
@@ -171,31 +184,31 @@ def sync(keep_list, bring_list):
     keep.sync()
 
 
-def load_cached_list():
+def load_cached_list() -> Optional[List[str]]:
     """
     Loads the cached list from a file.
     Returns the list if it exists, otherwise returns None.
     """
-    if os.path.exists('./data/list.txt'):
-        with open('./data/list.txt', 'r', encoding="utf-8") as f:
-            keep_list = f.read().split('\n')
-            f.close()
-            return keep_list
+    if os.path.exists("./data/list.txt"):
+        with open("./data/list.txt", "r", encoding="utf-8") as f:
+            keep_list = f.read().split("\n")
+        return keep_list
     else:
         return None
 
 
-def save_list(new_list):
+def save_list(new_list: List[str]) -> None:
     """
     Saves the provided list to a file.
     :param new_list: The list to save.
     """
-    with open('./data/list.txt', 'w', encoding="utf-8") as f:
-        f.write('\n'.join(new_list))
-        f.close()
+    with open("./data/list.txt", "w", encoding="utf-8") as f:
+        f.write("\n".join(new_list))
 
 
-def apply_list(new_list, bring_list, keep_list):
+def apply_list(
+    new_list: List[str], bring_list: dict, keep_list: gkeepapi.node.List
+) -> None:
     """
     Applies the provided list to the Google Keep and Bring lists.
     :param new_list: The list to apply.
@@ -207,44 +220,52 @@ def apply_list(new_list, bring_list, keep_list):
     bring_items = getAllItemsBring(bring_list)
     for item in bring_items:
         if item not in new_list:
-            print('Deleting item from bring: ' + item)
-            bring.removeItem(bring_list['listUuid'], item.encode('utf-8').decode('ISO-8859-9'))
+            logging.info(f"Deleting item from bring: {item}")
+            bring.removeItem(
+                bring_list["listUuid"], item.encode("utf-8").decode("ISO-8859-9")
+            )
     for item in new_list:
         if item not in bring_items:
-            print('Adding item to bring: ' + item)
-            bring.saveItem(bring_list['listUuid'], item.encode('utf-8').decode('ISO-8859-9'))
+            logging.info(f"Adding item to bring: {item}")
+            bring.saveItem(
+                bring_list["listUuid"], item.encode("utf-8").decode("ISO-8859-9")
+            )
 
     # keep
     keep_items = getAllItemsKeep(keep_list)
     for item in keep_items:
         if item not in new_list:
-            print('Deleting item from keep: ' + item)
+            logging.info(f"Deleting item from keep: {item}")
             get_keep_list_item(item, keep_list).delete()
     for item in new_list:
         if item not in keep_items:
-            print('Adding item to keep: ' + item)
-            keep_list.add(item.encode('utf-8').decode('ISO-8859-9'), False, gkeepapi.node.NewListItemPlacementValue.Bottom)
+            logging.info(f"Adding item to keep: {item}")
+            keep_list.add(
+                item.encode("utf-8").decode("ISO-8859-9"),
+                False,
+                gkeepapi.node.NewListItemPlacementValue.Bottom,
+            )
 
 
 # Main
-print('Starting app')
-print('Sync mode: ' + str(SYNC_MODE))
-print('Timeout: ' + str(TIMEOUT) + ' minutes')
+logging.info("Starting app")
+logging.info(f"Sync mode: {SYNC_MODE}")
+logging.info(f"Timeout: {TIMEOUT} minutes")
 
 login()
 
 # load Keep
 keep.sync()
 keepList = keep.get(KEEP_LIST_ID)
-print('Keep list: ' + keepList.title)
+logging.info(f"Keep list: {keepList.title}")
 
 # load Bring
-bringList = get_bring_list(bring.loadLists()['lists'])
+bringList = get_bring_list(bring.loadLists()["lists"])
 
 sync(keepList, bringList)
 
 if TIMEOUT != 0:
-    print('Starting scheduler run every ' + str(TIMEOUT) + ' minutes')
+    logging.info(f"Starting scheduler run every {TIMEOUT} minutes")
     schedule.every(TIMEOUT).minutes.do(sync, keepList, bringList)
     while True:
         schedule.run_pending()
