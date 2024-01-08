@@ -14,8 +14,8 @@ GOOGLE_PASSWORD = config("GOOGLE_PASSWORD")
 BRING_EMAIL = config("GOOGLE_EMAIL")
 BRING_PASSWORD = config("BRING_PASSWORD")
 KEEP_LIST_ID = config("KEEP_LIST_ID")
-SYNC_MODE = int(config("SYNC_MODE", default="0"))
-TIMEOUT = int(config("TIMEOUT", default="60"))
+SYNC_MODE = config("SYNC_MODE", default="0", cast=int)
+TIMEOUT = config("TIMEOUT", default="60", cast=int)
 
 # Logging
 logging.basicConfig(
