@@ -2,6 +2,7 @@
 import os
 import time
 from datetime import datetime
+from typing import List, Optional
 
 import gkeepapi
 import schedule
@@ -9,15 +10,15 @@ from decouple import config
 from python_bring_api.bring import Bring
 
 # Constants
-GOOGLE_EMAIL = config("GOOGLE_EMAIL")
-GOOGLE_TOKEN = config("GOOGLE_TOKEN", default=None)
-GOOGLE_PASSWORD = config("GOOGLE_PASSWORD")
-BRING_EMAIL = config("GOOGLE_EMAIL")
-BRING_LIST_NAME = config("BRING_LIST_NAME", default=None)
-BRING_PASSWORD = config("BRING_PASSWORD")
-KEEP_LIST_ID = config("KEEP_LIST_ID")
-SYNC_MODE = config("SYNC_MODE", default="0", cast=int)
-TIMEOUT = config("TIMEOUT", default="60", cast=int)
+GOOGLE_EMAIL: str = config("GOOGLE_EMAIL")
+GOOGLE_PASSWORD: str = config("GOOGLE_PASSWORD")
+BRING_EMAIL: str = config("GOOGLE_EMAIL")
+BRING_PASSWORD: str = config("BRING_PASSWORD")
+KEEP_LIST_ID: str = config("KEEP_LIST_ID")
+SYNC_MODE: int = config("SYNC_MODE", default="0", cast=int)
+TIMEOUT: int = config("TIMEOUT", default="60", cast=int)
+BRING_LIST_NAME: Optional[str] = config("BRING_LIST_NAME", default=None)
+GOOGLE_TOKEN: Optional[str] = config("GOOGLE_TOKEN", default=None)
 
 # Logging
 logging.basicConfig(
@@ -30,7 +31,7 @@ keep = gkeepapi.Keep()
 bring = Bring(BRING_EMAIL, BRING_PASSWORD)
 
 
-def login():
+def login() -> None:
     """
     Logs into the Bring and Google Keep services.
     """
@@ -61,7 +62,7 @@ def login():
     logging.info("Logged in")
 
 
-def delete_old_items(note):
+def delete_old_items(note: gkeepapi.node.TopLevelNode) -> None:
     """
     Deletes all checked items from the provided Google Keep note.
     :param note: The Google Keep note to delete items from.
@@ -71,7 +72,9 @@ def delete_old_items(note):
         item.delete()
 
 
-def get_keep_list_item(name, keep_list):
+def get_keep_list_item(
+    name: str, keep_list: gkeepapi.node.List
+) -> Optional[gkeepapi.node.ListItem]:
     """
     Returns the unchecked item with the provided name from the Google Keep list.
     If no such item exists, it returns None.
@@ -85,7 +88,7 @@ def get_keep_list_item(name, keep_list):
     return None
 
 
-def delete_duplicates(keep_list):
+def delete_duplicates(keep_list: gkeepapi.node.List) -> None:
     """
     Deletes duplicate items from the provided Google Keep list.
     :param keep_list: The Google Keep list to delete duplicates from.
@@ -98,7 +101,7 @@ def delete_duplicates(keep_list):
             items.remove(item)
 
 
-def get_bring_list(lists):
+def get_bring_list(lists: List[dict]) -> dict:
     """
     Returns the Bring list that matches the name provided in the environment variable 'BRING_LIST_NAME'.
     If 'BRING_LIST_NAME' is not set, it returns the first list.
@@ -112,7 +115,7 @@ def get_bring_list(lists):
     return lists[0]
 
 
-def getAllItemsBring(bring_list):
+def getAllItemsBring(bring_list: dict) -> List[str]:
     """
     Returns all items in the provided Bring list.
     :param bring_list: The Bring list to get items from.
@@ -122,7 +125,7 @@ def getAllItemsBring(bring_list):
     return [item["name"] for item in items["purchase"]]
 
 
-def getAllItemsKeep(keep_list):
+def getAllItemsKeep(keep_list: gkeepapi.node.List) -> List[str]:
     """
     Returns all unchecked items in the provided Google Keep note.
     :param keep_list: The Google Keep note to get items from.
@@ -131,7 +134,7 @@ def getAllItemsKeep(keep_list):
     return [item.text for item in keep_list.unchecked]
 
 
-def sync(keep_list, bring_list):
+def sync(keep_list: gkeepapi.node.List, bring_list: dict) -> None:
     """
     Synchronizes the provided Google Keep and Bring lists
     based on the sync mode set in the environment variable 'SYNC_MODE'.
@@ -181,7 +184,7 @@ def sync(keep_list, bring_list):
     keep.sync()
 
 
-def load_cached_list():
+def load_cached_list() -> Optional[List[str]]:
     """
     Loads the cached list from a file.
     Returns the list if it exists, otherwise returns None.
@@ -194,7 +197,7 @@ def load_cached_list():
         return None
 
 
-def save_list(new_list):
+def save_list(new_list: List[str]) -> None:
     """
     Saves the provided list to a file.
     :param new_list: The list to save.
@@ -203,7 +206,9 @@ def save_list(new_list):
         f.write("\n".join(new_list))
 
 
-def apply_list(new_list, bring_list, keep_list):
+def apply_list(
+    new_list: List[str], bring_list: dict, keep_list: gkeepapi.node.List
+) -> None:
     """
     Applies the provided list to the Google Keep and Bring lists.
     :param new_list: The list to apply.
