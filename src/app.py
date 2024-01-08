@@ -10,8 +10,10 @@ from python_bring_api.bring import Bring
 
 # Constants
 GOOGLE_EMAIL = config("GOOGLE_EMAIL")
+GOOGLE_TOKEN = config("GOOGLE_TOKEN", default=None)
 GOOGLE_PASSWORD = config("GOOGLE_PASSWORD")
 BRING_EMAIL = config("GOOGLE_EMAIL")
+BRING_LIST_NAME = config("BRING_LIST_NAME", default=None)
 BRING_PASSWORD = config("BRING_PASSWORD")
 KEEP_LIST_ID = config("KEEP_LIST_ID")
 SYNC_MODE = config("SYNC_MODE", default="0", cast=int)
@@ -34,28 +36,28 @@ def login():
     """
     bring.login()
 
-    if os.path.exists("./data/token.txt"):
+    token_file_path = "./data/token.txt"
+
+    if os.path.exists(token_file_path):
         logging.info("Using cached google token")
-        with open("./data/token.txt", "r") as f:
+        with open(token_file_path, "r") as f:
             token = f.read()
-            f.close()
-            os.remove("./data/token.txt")
-            keep.resume(GOOGLE_EMAIL, token)
-            token = keep.getMasterToken()
-            with open("./data/token.txt", "w") as fnew:
-                fnew.write(str(token))
-    elif config("GOOGLE_TOKEN") is not None:
-        logging.info("Using provided google token")
-        keep.resume(GOOGLE_EMAIL, config("GOOGLE_TOKEN"))
+        os.remove(token_file_path)
+        keep.resume(GOOGLE_EMAIL, token)
         token = keep.getMasterToken()
-        with open("./data/token.txt", "w") as f:
-            f.write(str(token))
+    elif GOOGLE_TOKEN:
+        logging.info("Using provided google token")
+        keep.resume(GOOGLE_EMAIL, GOOGLE_TOKEN)
+        token = keep.getMasterToken()
     else:
         logging.info("Getting new google token")
         keep.login(GOOGLE_EMAIL, GOOGLE_PASSWORD)
         token = keep.getMasterToken()
-        with open("./data/token.txt", "w") as f:
-            f.write(str(token))
+
+    logging.info("Saving google token")
+    with open(token_file_path, "w") as f:
+        f.write(str(token))
+
     logging.info("Logged in")
 
 
@@ -65,7 +67,7 @@ def delete_old_items(note):
     :param note: The Google Keep note to delete items from.
     """
     for item in note.checked:
-        logging.info("Deleting item: " + item.text)
+        logging.info(f"Deleting item: {item.text}")
         item.delete()
 
 
@@ -91,7 +93,7 @@ def delete_duplicates(keep_list):
     items = getAllItemsKeep(keep_list)
     for item in items:
         if items.count(item) > 1:
-            logging.info("Deleting duplicate item: " + item)
+            logging.info(f"Deleting duplicate item: {item}")
             get_keep_list_item(item, keep_list).delete()
             items.remove(item)
 
@@ -103,9 +105,9 @@ def get_bring_list(lists):
     :param lists: The list of Bring lists.
     :return: The selected Bring list.
     """
-    if config("BRING_LIST_NAME") is not None:
+    if BRING_LIST_NAME:
         for bring_list in lists:
-            if bring_list["name"] == config("BRING_LIST_NAME"):
+            if bring_list["name"] == BRING_LIST_NAME:
                 return bring_list
     return lists[0]
 
@@ -187,8 +189,7 @@ def load_cached_list():
     if os.path.exists("./data/list.txt"):
         with open("./data/list.txt", "r", encoding="utf-8") as f:
             keep_list = f.read().split("\n")
-            f.close()
-            return keep_list
+        return keep_list
     else:
         return None
 
@@ -200,7 +201,6 @@ def save_list(new_list):
     """
     with open("./data/list.txt", "w", encoding="utf-8") as f:
         f.write("\n".join(new_list))
-        f.close()
 
 
 def apply_list(new_list, bring_list, keep_list):
@@ -215,13 +215,13 @@ def apply_list(new_list, bring_list, keep_list):
     bring_items = getAllItemsBring(bring_list)
     for item in bring_items:
         if item not in new_list:
-            logging.info("Deleting item from bring: " + item)
+            logging.info(f"Deleting item from bring: {item}")
             bring.removeItem(
                 bring_list["listUuid"], item.encode("utf-8").decode("ISO-8859-9")
             )
     for item in new_list:
         if item not in bring_items:
-            logging.info("Adding item to bring: " + item)
+            logging.info(f"Adding item to bring: {item}")
             bring.saveItem(
                 bring_list["listUuid"], item.encode("utf-8").decode("ISO-8859-9")
             )
@@ -230,11 +230,11 @@ def apply_list(new_list, bring_list, keep_list):
     keep_items = getAllItemsKeep(keep_list)
     for item in keep_items:
         if item not in new_list:
-            logging.info("Deleting item from keep: " + item)
+            logging.info(f"Deleting item from keep: {item}")
             get_keep_list_item(item, keep_list).delete()
     for item in new_list:
         if item not in keep_items:
-            logging.info("Adding item to keep: " + item)
+            logging.info(f"Adding item to keep: {item}")
             keep_list.add(
                 item.encode("utf-8").decode("ISO-8859-9"),
                 False,
@@ -244,15 +244,15 @@ def apply_list(new_list, bring_list, keep_list):
 
 # Main
 logging.info("Starting app")
-logging.info("Sync mode: " + str(SYNC_MODE))
-logging.info("Timeout: " + str(TIMEOUT) + " minutes")
+logging.info(f"Sync mode: {SYNC_MODE}")
+logging.info(f"Timeout: {TIMEOUT} minutes")
 
 login()
 
 # load Keep
 keep.sync()
 keepList = keep.get(KEEP_LIST_ID)
-logging.info("Keep list: " + keepList.title)
+logging.info(f"Keep list: {keepList.title}")
 
 # load Bring
 bringList = get_bring_list(bring.loadLists()["lists"])
@@ -260,7 +260,7 @@ bringList = get_bring_list(bring.loadLists()["lists"])
 sync(keepList, bringList)
 
 if TIMEOUT != 0:
-    logging.info("Starting scheduler run every " + str(TIMEOUT) + " minutes")
+    logging.info(f"Starting scheduler run every {TIMEOUT} minutes")
     schedule.every(TIMEOUT).minutes.do(sync, keepList, bringList)
     while True:
         schedule.run_pending()
