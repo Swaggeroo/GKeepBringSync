@@ -1,5 +1,5 @@
 # Google Keep <-> Bring sync
-This is a simple script to sync your Google Keep notes with Bring shopping lists and vice versa.
+This is a simple script to sync your Google Keep notes with Bring shopping lists and vice versa. IMPORTANT: Read the whole readme, there are some special things to get it working.
 
 ## Disclaimer
 This script is not affiliated with Google or Bring. It is not guaranteed to work and may break at any time. Use at your own risk.
@@ -36,3 +36,6 @@ You need to provide the following environment variables:
 - I didn't test the expiration of the token yet. If it expires, the script will probably crash. At the next run it should delete the token.txt and crash again. After that it should work again. With docker this should be no problem as the container will be restarted automatically.
 - At the first run the script will take the keep and bring lists and merge them (Only with SYNC_MODE 0). After that it will only sync changes.
 - On my server it must run in host network mode.
+
+## Helping hand(s)
+[RealPotatoe](https://github.com/RealPotatoe) - Proofreading and general improvements
