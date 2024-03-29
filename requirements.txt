@@ -1,6 +1,5 @@
 python-bring-api~=2.0.0
 gkeepapi~=0.15.1
-gpsoauth==1.0.2
-urllib3==1.25.1
+gpsoauth~=1.0.4
 schedule~=1.2.1
 python-decouple~=3.8

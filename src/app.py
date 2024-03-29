@@ -202,6 +202,7 @@ def save_list(new_list: List[str]) -> None:
     Saves the provided list to a file.
     :param new_list: The list to save.
     """
+    new_list = clean_list(new_list)
     with open("./data/list.txt", "w", encoding="utf-8") as f:
         f.write("\n".join(new_list))
 
@@ -215,6 +216,7 @@ def apply_list(
     :param bring_list: The Bring list to apply the new list to.
     :param keep_list: The Google Keep list to apply the new list to.
     """
+    new_list = clean_list(new_list)
 
     # bring
     bring_items = getAllItemsBring(bring_list)
@@ -241,11 +243,18 @@ def apply_list(
         if item not in keep_items:
             logging.info(f"Adding item to keep: {item}")
             keep_list.add(
-                item.encode("utf-8").decode("ISO-8859-9"),
+                item.encode("utf-8").decode("utf-8"),
                 False,
                 gkeepapi.node.NewListItemPlacementValue.Bottom,
             )
 
+def clean_list(list: List[str]) -> List[str]:
+    """
+    Cleans the list from empty items.
+    :param list: The list to clean.
+    :return: The cleaned list.
+    """
+    return [item for item in list if item]
 
 # Main
 logging.info("Starting app")
