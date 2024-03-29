@@ -224,13 +224,13 @@ def apply_list(
         if item not in new_list:
             logging.info(f"Deleting item from bring: {item}")
             bring.removeItem(
-                bring_list["listUuid"], item.encode("utf-8").decode("ISO-8859-9")
+                bring_list["listUuid"], item.encode("utf-8").decode("utf-8")
             )
     for item in new_list:
         if item not in bring_items:
             logging.info(f"Adding item to bring: {item}")
             bring.saveItem(
-                bring_list["listUuid"], item.encode("utf-8").decode("ISO-8859-9")
+                bring_list["listUuid"], item.encode("utf-8").decode("utf-8")
             )
 
     # keep
