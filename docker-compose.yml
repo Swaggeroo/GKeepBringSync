@@ -10,7 +10,7 @@ services:
     environment:
       # Google
       - GOOGLE_EMAIL=<your email>
-      - GOOGLE_PASSWORD=<your password>
+      - GOOGLE_TOKEN=<your token>
       - KEEP_LIST_ID=<your list id>
 
       # Bring
@@ -22,4 +22,3 @@ services:
       #- SYNC_MODE=0 # 0 = bidirectional, 1 = bring master, 2 = google master
       #- TIMEOUT=60 # minutes
       #- BRING_LIST_NAME=Groceries
-      #- GOOGLE_TOKEN=<your token>

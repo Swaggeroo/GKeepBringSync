@@ -11,8 +11,7 @@ from python_bring_api.bring import Bring
 
 # Constants
 GOOGLE_EMAIL: str = config("GOOGLE_EMAIL")
-GOOGLE_PASSWORD: str = config("GOOGLE_PASSWORD")
-BRING_EMAIL: str = config("GOOGLE_EMAIL")
+BRING_EMAIL: str = config("BRING_EMAIL")
 BRING_PASSWORD: str = config("BRING_PASSWORD")
 KEEP_LIST_ID: str = config("KEEP_LIST_ID")
 SYNC_MODE: int = config("SYNC_MODE", default="0", cast=int)
@@ -44,16 +43,18 @@ def login() -> None:
         with open(token_file_path, "r") as f:
             token = f.read()
         os.remove(token_file_path)
-        keep.resume(GOOGLE_EMAIL, token)
+        if not token:
+            logging.fatal("Google token is empty. Please provide a valid token.")
+            exit(1)
+        keep.authenticate(GOOGLE_EMAIL, token)
         token = keep.getMasterToken()
     elif GOOGLE_TOKEN:
         logging.info("Using provided google token")
-        keep.resume(GOOGLE_EMAIL, GOOGLE_TOKEN)
+        keep.authenticate(GOOGLE_EMAIL, GOOGLE_TOKEN)
         token = keep.getMasterToken()
     else:
-        logging.info("Getting new google token")
-        keep.login(GOOGLE_EMAIL, GOOGLE_PASSWORD)
-        token = keep.getMasterToken()
+        logging.fatal("Google token not found. Please provide a token. See README.md for more information.")
+        exit(1)
 
     logging.info("Saving google token")
     with open(token_file_path, "w") as f:
