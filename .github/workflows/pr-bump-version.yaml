@@ -1,0 +1,49 @@
+name: Bump Version Renovate
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  bump-version:
+    if: github.actor == 'renovate[bot]'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Read current version
+        id: get_version
+        run: |
+          VERSION=$(cat version.txt)
+          echo "Current version: $VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Bump version inside PR
+        run: |
+          VERSION=${{ env.VERSION }}
+          VERSION_PART=$(echo $VERSION | tr -d '[:space:]' | awk -F. '{print NF}')
+          
+           if [[ $VERSION_PART -eq 3 ]]; then
+            IFS='.' read -r -a VERSION_PARTS <<< "$VERSION"
+            PATCH=${VERSION_PARTS[2]}
+            PATCH=$((PATCH + 1))
+            NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.$PATCH"
+          fi
+          
+          echo "New version: $NEW_VERSION"
+          echo $NEW_VERSION > version.txt
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Commit new version
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -m "chore: bump version to ${{ env.NEW_VERSION }} inside PR [skip ci]"
+          git push origin master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
