@@ -1,4 +1,4 @@
-FROM python:3.13
+FROM python:3.14
 LABEL authors="Swaggeroo"
 
 WORKDIR /usr/src/app
