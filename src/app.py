@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import os
 import time
 from datetime import datetime
@@ -30,8 +30,8 @@ logging.basicConfig(
 
 # init services
 gkeepapi.node.DEBUG = True
-keep = gkeepapi.Keep()
-bring = Bring(BRING_EMAIL, BRING_PASSWORD)
+keep = gkeepapi.Keep() if callable(gkeepapi.Keep) else None
+bring = Bring(BRING_EMAIL, BRING_PASSWORD) if callable(Bring) else None
 @dataclass
 class ShoppingItem:
     """
@@ -82,7 +82,7 @@ def parse_bring_specification(specification: str) -> list[tuple[int, str]]:
     Parses a Bring specification into one or more quantity/comment pairs.
 
     Bring merges duplicate items using " + ". Each merged part is returned
-    separately.
+    separately if parts match merged quantity specifications.
 
     Examples:
         ""                  -> [(1, "")]
@@ -91,17 +91,21 @@ def parse_bring_specification(specification: str) -> list[tuple[int, str]]:
         "2 Bio + 4 Bio"     -> [(2, "Bio"), (4, "Bio")]
         "2 + 4 Bio"         -> [(2, ""), (4, "Bio")]
         "Bio + 2 Bio"       -> [(1, "Bio"), (2, "Bio")]
+        "Salt + Pepper"     -> [(1, "Salt + Pepper")]
 
     :param specification: The Bring specification.
     :return: A list of quantity/comment pairs.
     """
 
-    result: list[tuple[int, str]] = []
+    spec = specification.strip()
+    if not spec:
+        return [(1, "")]
 
-    for part in specification.split(" + "):
-        result.append(parse_specification(part.strip()))
+    parts = spec.split(" + ")
+    if len(parts) > 1 and any(re.match(r"^\d+", p.strip()) for p in parts):
+        return [parse_specification(part.strip()) for part in parts]
 
-    return result
+    return [parse_specification(spec)]
 
 def format_specification(amount: int, comment: str) -> str:
     """
@@ -158,17 +162,22 @@ def parse_keep_item(text: str) -> ShoppingItem:
             original_name=name,
         )
 
-    name, title_amount = extract_amount_from_title(
-        match.group(1).strip()
-    )
+    title_part = match.group(1).strip()
+    spec_part = match.group(2).strip()
 
-    amount, comment = parse_specification(
-        match.group(2)
-    )
+    name, title_amount = extract_amount_from_title(title_part)
+    spec_amount, comment = parse_specification(spec_part)
+
+    if title_amount > 1 and spec_amount > 1:
+        final_amount = title_amount + spec_amount - 1
+    elif spec_amount > 1:
+        final_amount = spec_amount
+    else:
+        final_amount = title_amount
 
     return ShoppingItem(
         name=name,
-        amount=title_amount + amount - 1,
+        amount=final_amount,
         comment=comment,
         original_name=name,
     )
@@ -260,34 +269,40 @@ def get_keep_list_item(
 
 def delete_duplicates(keep_list: gkeepapi.node.List) -> None:
     """
-    Merges duplicate Google Keep items with the same name and comment.
-    Quantities are summed while preserving different comments.
+    Merges duplicate Google Keep items with the same name and comment in-place.
+    Quantities are summed while preserving item placement and avoiding deletion of unique items.
     :param keep_list: The Google Keep list to merge.
     """
 
-    merged: dict[tuple[str, str], ShoppingItem] = {}
+    grouped: dict[tuple[str, str], list[tuple[gkeepapi.node.ListItem, ShoppingItem]]] = {}
 
-    for item in getAllItemsKeep(keep_list):
+    for keep_item in list(keep_list.unchecked):
+        parsed = parse_keep_item(keep_item.text)
+        key = shopping_item_key(parsed)
+        if key not in grouped:
+            grouped[key] = []
+        grouped[key].append((keep_item, parsed))
 
-        key = shopping_item_key(item)
-
-        if key not in merged:
-            merged[key] = copy_item(item)
+    for items in grouped.values():
+        if len(items) <= 1:
             continue
 
-        merged[key].amount += item.amount
+        first_keep_item, first_parsed = items[0]
+        total_amount = sum(parsed.amount for _, parsed in items)
 
-    # remove every unchecked item
-    for item in list(keep_list.unchecked):
-        item.delete()
-
-    # recreate merged list
-    for item in merged.values():
-        keep_list.add(
-            format_keep_item(item),
-            False,
-            gkeepapi.node.NewListItemPlacementValue.Bottom,
+        merged_item = ShoppingItem(
+            name=first_parsed.name,
+            amount=total_amount,
+            comment=first_parsed.comment,
         )
+
+        new_text = format_keep_item(merged_item)
+        if first_keep_item.text != new_text:
+            first_keep_item.text = new_text
+
+        for duplicate_keep_item, _ in items[1:]:
+            logging.info(f"Deleting duplicate Keep item: {duplicate_keep_item.text}")
+            duplicate_keep_item.delete()
 
 
 def get_bring_list(lists: List[dict]) -> dict:
@@ -557,7 +572,6 @@ NUMBER_WORDS = {
     "ten": 10,
     "eleven": 11,
     "twelve": 12,
-    
     # German
     "ein": 1,
     "eine": 1,
@@ -576,47 +590,47 @@ NUMBER_WORDS = {
     "zwölf": 12,
 }
 
+
 def extract_amount_from_title(title: str) -> tuple[str, int]:
     """
-    Extracts a quantity from the beginning or end of a title.
+    Extracts a quantity from the beginning of a title if specified as a number,
+    digit prefix, or number word.
 
     Supported examples:
-        "2 Milk"      -> ("Milk", 2)
-        "Milk 2"      -> ("Milk", 2)
-        "Two Milk"    -> ("Milk", 2)
-        "Milk Two"    -> ("Milk", 2)
+        "2 Milk"           -> ("Milk", 2)
+        "2x Milk"          -> ("Milk", 2)
+        "Two Milk"         -> ("Milk", 2)
+        "Ein Apfel"        -> ("Apfel", 1)
+        "Eine Flasche"     -> ("Flasche", 1)
+        "Zwei Flaschen"    -> ("Flaschen", 2)
+        "iPhone 15"        -> ("iPhone 15", 1)
 
-    If no quantity is found, the original title and a quantity of 1 are
-    returned.
+    If no leading quantity is found, the original title and quantity 1 are returned.
 
     :param title: The item title.
     :return: A tuple containing the cleaned title and extracted quantity.
     """
 
-    words = title.strip().split()
+    title_clean = title.strip()
+    words = title_clean.split()
 
     if len(words) <= 1:
-        return title.strip(), 1
+        return title_clean, 1
 
-    # Leading number
     first = words[0].lower()
-
-    if first.isdigit():
-        return " ".join(words[1:]).strip(), int(first)
+    match = re.match(r"^(\d+)x?$", first)
+    if match:
+        amount = int(match.group(1))
+        rest = " ".join(words[1:]).strip()
+        if rest:
+            return rest, amount
 
     if first in NUMBER_WORDS:
-        return " ".join(words[1:]).strip(), NUMBER_WORDS[first]
+        rest = " ".join(words[1:]).strip()
+        if rest:
+            return rest, NUMBER_WORDS[first]
 
-    # Trailing number
-    last = words[-1].lower()
-
-    if last.isdigit():
-        return " ".join(words[:-1]).strip(), int(last)
-
-    if last in NUMBER_WORDS:
-        return " ".join(words[:-1]).strip(), NUMBER_WORDS[last]
-
-    return title.strip(), 1
+    return title_clean, 1
 
 def get_all_keys(
     keep_items: list[ShoppingItem],
@@ -937,37 +951,14 @@ def apply_list(
             if normalize_name(current_name) != name:
                 continue
 
-            logging.info(f"Removing {current.original_name}")
-            
-            logging.info(
-                f"Removing original_name='{current.original_name}' "
-                f"name='{current.name}' "
-                f"amount={current.amount} "
-                f"comment='{current.comment}'"
-            )
+            logging.info(f"Removing Bring item: {current.original_name}")
 
             bring.removeItem(
                 bring_list["listUuid"],
                 current.original_name,
             )
+            time.sleep(1)
 
-        # Bring Zeit geben
-        time.sleep(1)
-
-        # Jetzt den tatsächlichen Zustand neu laden
-        raw_bring_items = getAllItemsBring(bring_list)
-
-        # Prüfen ob wirklich alles weg ist
-        for current in raw_bring_items:
-
-            current_name, _ = extract_amount_from_title(current.name)
-
-            if normalize_name(current_name) == name:
-                logging.warning(
-                    f"{current.original_name} still exists after delete!"
-                )
-
-        # Erst jetzt neu anlegen
         for item in bring_new_items:
 
             if normalize_name(item.name) != name:
@@ -978,11 +969,9 @@ def apply_list(
                 item.name,
                 item.specification(),
             )
+            time.sleep(1)
 
             break
-
-        # Und danach erneut neu laden
-        raw_bring_items = getAllItemsBring(bring_list)
 
     # Google Keep
     keep_items = getAllItemsKeep(keep_list)
@@ -1038,34 +1027,35 @@ def apply_list(
             )
 
             if keep_item is not None:
-                keep_item.delete()
+                keep_item.text = format_keep_item(item)
+            else:
+                keep_list.add(
+                    format_keep_item(item),
+                    False,
+                    gkeepapi.node.NewListItemPlacementValue.Bottom,
+                )
 
-            keep_list.add(
-                format_keep_item(item),
-                False,
-                gkeepapi.node.NewListItemPlacementValue.Bottom,
-            )
+if __name__ == "__main__":
+    # Main
+    logging.info("Starting app")
+    logging.info(f"Sync mode: {SYNC_MODE}")
+    logging.info(f"Timeout: {TIMEOUT} minutes")
 
-# Main
-logging.info("Starting app")
-logging.info(f"Sync mode: {SYNC_MODE}")
-logging.info(f"Timeout: {TIMEOUT} minutes")
+    login()
 
-login()
+    # load Keep
+    keep.sync()
+    keepList = keep.get(KEEP_LIST_ID)
+    logging.info(f"Keep list: {keepList.title}")
 
-# load Keep
-keep.sync()
-keepList = keep.get(KEEP_LIST_ID)
-logging.info(f"Keep list: {keepList.title}")
+    # load Bring
+    bringList = get_bring_list(bring.loadLists()["lists"])
 
-# load Bring
-bringList = get_bring_list(bring.loadLists()["lists"])
+    sync(keepList, bringList)
 
-sync(keepList, bringList)
-
-if TIMEOUT != 0:
-    logging.info(f"Starting scheduler run every {TIMEOUT} minutes")
-    schedule.every(TIMEOUT).minutes.do(sync, keepList, bringList)
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
+    if TIMEOUT != 0:
+        logging.info(f"Starting scheduler run every {TIMEOUT} minutes")
+        schedule.every(TIMEOUT).minutes.do(sync, keepList, bringList)
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
