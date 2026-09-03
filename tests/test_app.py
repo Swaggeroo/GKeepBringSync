@@ -1,9 +1,19 @@
 import sys
+import os
 import unittest
 from unittest.mock import MagicMock
 
+for key, value in {
+    "GOOGLE_EMAIL": "test@example.com",
+    "GOOGLE_TOKEN": "test-token",
+    "KEEP_LIST_ID": "test-list-id",
+    "BRING_EMAIL": "test@example.com",
+    "BRING_PASSWORD": "test-password",
+}.items():
+    os.environ.setdefault(key, value)
+
 # Mock missing third-party dependencies if not installed
-for mod in ["gkeepapi", "gkeepapi.node", "schedule", "decouple", "python_bring_api", "python_bring_api.bring"]:
+for mod in ["aiohttp", "gkeepapi", "gkeepapi.node", "schedule", "decouple", "bring_api"]:
     if mod not in sys.modules:
         try:
             __import__(mod)

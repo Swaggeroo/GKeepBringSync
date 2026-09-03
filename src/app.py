@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import time
@@ -8,10 +9,11 @@ from dataclasses import asdict
 import json
 import re
 
+import aiohttp
 import gkeepapi
 import schedule
 from decouple import config
-from python_bring_api.bring import Bring
+from bring_api import Bring
 
 # Constants
 GOOGLE_EMAIL: str = config("GOOGLE_EMAIL")
@@ -21,6 +23,7 @@ KEEP_LIST_ID: str = config("KEEP_LIST_ID")
 SYNC_MODE: int = config("SYNC_MODE", default="0", cast=int)
 TIMEOUT: int = config("TIMEOUT", default="60", cast=int)
 BRING_LIST_NAME: Optional[str] = config("BRING_LIST_NAME", default=None)
+BRING_LANGUAGE_CODE: str = config("BRING_LANGUAGE_CODE", default="en-US")
 GOOGLE_TOKEN: Optional[str] = config("GOOGLE_TOKEN", default=None)
 
 # Logging
@@ -31,7 +34,81 @@ logging.basicConfig(
 # init services
 gkeepapi.node.DEBUG = True
 keep = gkeepapi.Keep() if callable(gkeepapi.Keep) else None
-bring = Bring(BRING_EMAIL, BRING_PASSWORD) if callable(Bring) else None
+
+
+class BringClient:
+    """Synchronous adapter around the asynchronous, localized Bring client."""
+
+    def __init__(self, email: str, password: str) -> None:
+        self._email = email
+        self._password = password
+        self._loop = asyncio.new_event_loop()
+        self._session: aiohttp.ClientSession | None = None
+        self._client: Bring | None = None
+
+    def _run(self, coroutine):
+        return self._loop.run_until_complete(coroutine)
+
+    def _require_client(self) -> Bring:
+        if self._client is None:
+            raise RuntimeError("Bring client has not been logged in.")
+        return self._client
+
+    def login(self) -> None:
+        async def _login() -> None:
+            self._session = aiohttp.ClientSession()
+            self._client = Bring(self._session, self._email, self._password)
+            await self._client.login()
+
+        self._run(_login())
+
+    def loadLists(self) -> dict:
+        lists = self._run(self._require_client().load_lists())
+        return {
+            "lists": [
+                {"listUuid": item.listUuid, "name": item.name}
+                for item in lists.lists
+            ]
+        }
+
+    def getItems(self, list_uuid: str) -> dict:
+        items = self._run(self._require_client().get_list(list_uuid))
+        return {
+            "purchase": [
+                {
+                    "name": item.itemId,
+                    "specification": item.specification,
+                }
+                for item in items.items.purchase
+            ]
+        }
+
+    def saveItem(
+        self, list_uuid: str, item_name: str, specification: str = ""
+    ) -> None:
+        self._run(
+            self._require_client().save_item(list_uuid, item_name, specification)
+        )
+
+    def removeItem(self, list_uuid: str, item_name: str) -> None:
+        self._run(self._require_client().remove_item(list_uuid, item_name))
+
+    def close(self) -> None:
+        if self._session is not None and not self._session.closed:
+            self._run(self._session.close())
+        self._loop.close()
+
+    def setListArticleLanguage(self, list_uuid: str, language_code: str) -> None:
+        async def _set_language() -> None:
+            client = self._require_client()
+            await client.set_list_article_language(list_uuid, language_code)
+            await client.reload_user_list_settings()
+            await client.reload_article_translations()
+
+        self._run(_set_language())
+
+
+bring = BringClient(BRING_EMAIL, BRING_PASSWORD) if callable(Bring) else None
 @dataclass
 class ShoppingItem:
     """
@@ -1050,6 +1127,8 @@ if __name__ == "__main__":
 
     # load Bring
     bringList = get_bring_list(bring.loadLists()["lists"])
+    logging.info(f"Setting Bring article language to: {BRING_LANGUAGE_CODE}")
+    bring.setListArticleLanguage(bringList["listUuid"], BRING_LANGUAGE_CODE)
 
     sync(keepList, bringList)
 
@@ -1059,3 +1138,5 @@ if __name__ == "__main__":
         while True:
             schedule.run_pending()
             time.sleep(1)
+    else:
+        bring.close()
