@@ -22,3 +22,4 @@ services:
       #- SYNC_MODE=0 # 0 = bidirectional, 1 = bring master, 2 = google master
       #- TIMEOUT=60 # minutes
       #- BRING_LIST_NAME=Groceries
+      #- BRING_LANGUAGE_CODE=en-US # optional: overrides Bring list language, e.g. en-US, de-DE

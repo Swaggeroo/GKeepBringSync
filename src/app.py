@@ -23,7 +23,7 @@ KEEP_LIST_ID: str = config("KEEP_LIST_ID")
 SYNC_MODE: int = config("SYNC_MODE", default="0", cast=int)
 TIMEOUT: int = config("TIMEOUT", default="60", cast=int)
 BRING_LIST_NAME: Optional[str] = config("BRING_LIST_NAME", default=None)
-BRING_LANGUAGE_CODE: str = config("BRING_LANGUAGE_CODE", default="en-US")
+BRING_LANGUAGE_CODE: Optional[str] = config("BRING_LANGUAGE_CODE", default=None)
 GOOGLE_TOKEN: Optional[str] = config("GOOGLE_TOKEN", default=None)
 
 # Logging
@@ -43,6 +43,7 @@ class BringClient:
         self._email = email
         self._password = password
         self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
         self._session: aiohttp.ClientSession | None = None
         self._client: Bring | None = None
 
@@ -96,7 +97,8 @@ class BringClient:
     def close(self) -> None:
         if self._session is not None and not self._session.closed:
             self._run(self._session.close())
-        self._loop.close()
+        if not self._loop.is_closed():
+            self._loop.close()
 
     def setListArticleLanguage(self, list_uuid: str, language_code: str) -> None:
         async def _set_language() -> None:
@@ -1113,30 +1115,35 @@ def apply_list(
                 )
 
 if __name__ == "__main__":
-    # Main
-    logging.info("Starting app")
-    logging.info(f"Sync mode: {SYNC_MODE}")
-    logging.info(f"Timeout: {TIMEOUT} minutes")
+    try:
+        # Main
+        logging.info("Starting app")
+        logging.info(f"Sync mode: {SYNC_MODE}")
+        logging.info(f"Timeout: {TIMEOUT} minutes")
 
-    login()
+        login()
 
-    # load Keep
-    keep.sync()
-    keepList = keep.get(KEEP_LIST_ID)
-    logging.info(f"Keep list: {keepList.title}")
+        # load Keep
+        keep.sync()
+        keepList = keep.get(KEEP_LIST_ID)
+        logging.info(f"Keep list: {keepList.title}")
 
-    # load Bring
-    bringList = get_bring_list(bring.loadLists()["lists"])
-    logging.info(f"Setting Bring article language to: {BRING_LANGUAGE_CODE}")
-    bring.setListArticleLanguage(bringList["listUuid"], BRING_LANGUAGE_CODE)
+        # load Bring
+        bringList = get_bring_list(bring.loadLists()["lists"])
+        if BRING_LANGUAGE_CODE:
+            logging.info(f"Setting Bring article language to: {BRING_LANGUAGE_CODE}")
+            bring.setListArticleLanguage(bringList["listUuid"], BRING_LANGUAGE_CODE)
+        else:
+            logging.info("Using existing Bring list article language")
 
-    sync(keepList, bringList)
+        sync(keepList, bringList)
 
-    if TIMEOUT != 0:
-        logging.info(f"Starting scheduler run every {TIMEOUT} minutes")
-        schedule.every(TIMEOUT).minutes.do(sync, keepList, bringList)
-        while True:
-            schedule.run_pending()
-            time.sleep(1)
-    else:
-        bring.close()
+        if TIMEOUT != 0:
+            logging.info(f"Starting scheduler run every {TIMEOUT} minutes")
+            schedule.every(TIMEOUT).minutes.do(sync, keepList, bringList)
+            while True:
+                schedule.run_pending()
+                time.sleep(1)
+    finally:
+        if bring is not None:
+            bring.close()

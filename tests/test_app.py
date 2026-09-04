@@ -1,7 +1,7 @@
 import sys
 import os
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 
 for key, value in {
     "GOOGLE_EMAIL": "test@example.com",
@@ -19,6 +19,13 @@ for mod in ["aiohttp", "gkeepapi", "gkeepapi.node", "schedule", "decouple", "bri
             __import__(mod)
         except ImportError:
             m = MagicMock()
+            if mod == "decouple":
+                def mock_config(key, default=None, cast=None):
+                    val = os.environ.get(key, default)
+                    if val is not None and cast is not None:
+                        return cast(val)
+                    return val
+                m.config = mock_config
             sys.modules[mod] = m
 
 from src.app import (
@@ -33,6 +40,8 @@ from src.app import (
     shopping_item_key,
     build_bring_items,
     merge_duplicates,
+    BringClient,
+    BRING_LANGUAGE_CODE,
 )
 
 
@@ -149,3 +158,66 @@ class TestGKeepBringSync(unittest.TestCase):
         item_a2.delete.assert_called_once()
         self.assertEqual(item_b.text, "Bread")
         item_b.delete.assert_not_called()
+
+    def test_bring_language_code_default_none(self):
+        self.assertIsNone(BRING_LANGUAGE_CODE)
+
+    def test_bring_client_init_and_close(self):
+        client = BringClient("test@example.com", "secret")
+        self.assertIsNotNone(client._loop)
+        client.close()
+        self.assertTrue(client._loop.is_closed())
+
+    def test_bring_client_require_client_raises_before_login(self):
+        client = BringClient("test@example.com", "secret")
+        with self.assertRaises(RuntimeError):
+            client._require_client()
+        client.close()
+
+    def test_bring_client_delegation(self):
+        client = BringClient("test@example.com", "secret")
+        mock_bring = MagicMock()
+        client._client = mock_bring
+
+        # loadLists
+        list_item = MagicMock()
+        list_item.listUuid = "uuid-123"
+        list_item.name = "Groceries"
+        lists_response = MagicMock()
+        lists_response.lists = [list_item]
+        mock_bring.load_lists = AsyncMock(return_value=lists_response)
+
+        result = client.loadLists()
+        self.assertEqual(result, {"lists": [{"listUuid": "uuid-123", "name": "Groceries"}]})
+
+        # getItems
+        purchase_item = MagicMock()
+        purchase_item.itemId = "Bread"
+        purchase_item.specification = "Fresh"
+        items_response = MagicMock()
+        items_response.items.purchase = [purchase_item]
+        mock_bring.get_list = AsyncMock(return_value=items_response)
+
+        items = client.getItems("uuid-123")
+        self.assertEqual(items, {"purchase": [{"name": "Bread", "specification": "Fresh"}]})
+
+        # saveItem
+        mock_bring.save_item = AsyncMock()
+        client.saveItem("uuid-123", "Milk", "2L")
+        mock_bring.save_item.assert_called_once_with("uuid-123", "Milk", "2L")
+
+        # removeItem
+        mock_bring.remove_item = AsyncMock()
+        client.removeItem("uuid-123", "Milk")
+        mock_bring.remove_item.assert_called_once_with("uuid-123", "Milk")
+
+        # setListArticleLanguage
+        mock_bring.set_list_article_language = AsyncMock()
+        mock_bring.reload_user_list_settings = AsyncMock()
+        mock_bring.reload_article_translations = AsyncMock()
+        client.setListArticleLanguage("uuid-123", "de-DE")
+        mock_bring.set_list_article_language.assert_called_once_with("uuid-123", "de-DE")
+        mock_bring.reload_user_list_settings.assert_called_once()
+        mock_bring.reload_article_translations.assert_called_once()
+
+        client.close()

@@ -29,7 +29,7 @@ Save the token in a file called `token.txt` in the same directory as the script 
 | `SYNC_MODE`       | 0 = bidirectional, 1 = bring master, 2 = google master                                                                | 0                            | No       |
 | `TIMEOUT`         | Timeout between syncs in *minutes* \| 0 = only run once (with the provided docker-compose it will restart infinitely) | 60                           | No       |
 | `BRING_LIST_NAME` | Name of your Bring List                                                                                               | Using first list in Response | No       | 
-| `BRING_LANGUAGE_CODE` | Bring article language for the selected list, for example `en-US`, `de-DE`, or `fr-FR`                            | `en-US`                      | No       |
+| `BRING_LANGUAGE_CODE` | Optional: Override Bring article language for the selected list, e.g. `en-US`, `de-DE`, or `fr-FR` | Keep existing Bring list language | No       |
 | `GOOGLE_TOKEN`    | Master Token (See ### Acquire Master token)                                                                           |                              | No       |
 
 ### Sync modes
@@ -42,7 +42,7 @@ Save the token in a file called `token.txt` in the same directory as the script 
 ### Please note
 - The token.txt file is used to store the Google Auth token. Keep it safe as it can be used to gain full access to your Google account.
 - At the first run the script will take the keep and bring lists and merge them (Only with SYNC_MODE 0). After that it will only sync changes.
-- At startup, the sync applies `BRING_LANGUAGE_CODE` to the selected Bring list and uses the same language when it reads and writes catalog items. Use a Bring-supported locale such as `en-US`.
+- If `BRING_LANGUAGE_CODE` is set, the sync applies it to the selected Bring list at startup. If omitted, the sync automatically uses the language already configured for that list in Bring.
 - For me only host network works with the docker container.
 
 ## Helping hand(s)
