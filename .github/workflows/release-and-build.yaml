@@ -20,7 +20,7 @@ jobs:
     permissions:
       contents: write
       packages: write
-    uses: Swaggeroo/ci-workflows/.github/workflows/release-and-build.yaml@v1.0.0
+    uses: Swaggeroo/ci-workflows/.github/workflows/release-and-build.yaml@v1.1.0
     with:
       version_file: version.txt
       image_namespace: ${{ github.repository_owner }}
