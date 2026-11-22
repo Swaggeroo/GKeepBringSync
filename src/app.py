@@ -820,6 +820,16 @@ def sync(keep_list: gkeepapi.node.List, bring_list: dict) -> None:
                 new_list.append(copy_item(bring_item))
                 continue
 
+            # New item in both (added on both sides since the last sync,
+            # or no cached list yet, e.g. on the first run)
+            if (
+                keep_item is not None
+                and bring_item is not None
+                and cached_item is None
+            ):
+                new_list.append(copy_item(keep_item))
+                continue
+
             # Deleted in Google Keep
             if (
                 keep_item is None

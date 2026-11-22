@@ -1,7 +1,7 @@
 import sys
 import os
 import unittest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, patch
 
 for key, value in {
     "GOOGLE_EMAIL": "test@example.com",
@@ -221,3 +221,37 @@ class TestGKeepBringSync(unittest.TestCase):
         mock_bring.reload_article_translations.assert_called_once()
 
         client.close()
+
+    def _run_bidirectional_sync(self, keep_items, bring_items, cached_items):
+        import src.app as app
+
+        with patch.object(app, "SYNC_MODE", 0), \
+                patch.object(app, "keep", MagicMock()), \
+                patch.object(app, "delete_old_items"), \
+                patch.object(app, "delete_duplicates"), \
+                patch.object(app, "getAllItemsKeep", return_value=keep_items), \
+                patch.object(app, "getAllItemsBring", return_value=bring_items), \
+                patch.object(app, "load_cached_list", return_value=cached_items), \
+                patch.object(app, "save_list"), \
+                patch.object(app, "apply_list") as apply_list:
+            app.sync(MagicMock(), {"listUuid": "uuid-123"})
+
+        return [item.name for item in apply_list.call_args[0][0]]
+
+    def test_sync_keeps_item_added_on_both_sides(self):
+        # Same item added in Google Keep and Bring between two syncs
+        names = self._run_bidirectional_sync(
+            keep_items=[ShoppingItem("Milk")],
+            bring_items=[ShoppingItem("Milk")],
+            cached_items=[],
+        )
+        self.assertEqual(names, ["Milk"])
+
+    def test_sync_keeps_items_without_cached_list(self):
+        # First run: no cached list yet, items already on both sides
+        names = self._run_bidirectional_sync(
+            keep_items=[ShoppingItem("Milk"), ShoppingItem("Bread")],
+            bring_items=[ShoppingItem("Milk"), ShoppingItem("Bread")],
+            cached_items=None,
+        )
+        self.assertEqual(sorted(names), ["Bread", "Milk"])
