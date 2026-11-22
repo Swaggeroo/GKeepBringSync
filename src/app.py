@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from dataclasses import asdict
 import json
 import re
+import signal
 
 import aiohttp
 import gkeepapi
@@ -1114,7 +1115,24 @@ def apply_list(
                     gkeepapi.node.NewListItemPlacementValue.Bottom,
                 )
 
+shutdown_requested = False
+
+
+def handle_shutdown_signal(signum, frame) -> None:
+    """
+    Requests a clean shutdown. Python ignores SIGTERM when running as PID 1
+    (e.g. in a container without an init process), so `docker stop` would
+    otherwise wait for its timeout and then kill the app.
+    """
+    global shutdown_requested
+    logging.info(f"Received signal {signum}, shutting down...")
+    shutdown_requested = True
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, handle_shutdown_signal)
+    signal.signal(signal.SIGINT, handle_shutdown_signal)
+
     try:
         # Main
         logging.info("Starting app")
@@ -1141,9 +1159,10 @@ if __name__ == "__main__":
         if TIMEOUT != 0:
             logging.info(f"Starting scheduler run every {TIMEOUT} minutes")
             schedule.every(TIMEOUT).minutes.do(sync, keepList, bringList)
-            while True:
+            while not shutdown_requested:
                 schedule.run_pending()
                 time.sleep(1)
+            logging.info("Stopped")
     finally:
         if bring is not None:
             bring.close()
